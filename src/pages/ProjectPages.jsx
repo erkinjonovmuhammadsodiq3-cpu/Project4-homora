@@ -1,0 +1,29 @@
+import HomeInsights from '../components/HomeInsights';
+import {Link,useParams} from 'react-router-dom';
+import {Heading,Progress} from '../components/ui';
+import {useCart,useProjects} from '../context/AppContexts';
+export function Projects(){
+  const {projects,dispatch}=useProjects();
+  return <div className="mx-auto max-w-7xl px-5 py-12"><Heading k="Projects">My projects</Heading>
+  <div className="grid gap-5 md:grid-cols-3">{projects.map(p=><div key={p.id} className="card"><img loading="lazy" src={p.products[0]?.image||'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=900&q=80'} alt={`${p.name} home reference`} className="mb-4 aspect-[16/9] w-full rounded-xl object-cover"/>
+   <h2 className="font-display text-3xl uppercase">{p.name}</h2><p className="text-sm text-stone">{p.style} · {p.homeType||'Home project'} · updated {p.updated}</p><p className="mt-2">{p.progress}% COMPLETE</p><Progress value={p.progress}/>
+    <p className="my-2 text-sm"><strong>${p.spent.toLocaleString()}</strong> spent · ${p.plannedTotal??p.products.reduce((sum,item)=>sum+item.price,0)} planned</p><p className="mb-3 text-xs text-stone">Budget ${p.budget.toLocaleString()}</p><div className="flex gap-2"><Link className="btn btn-dark" to={`/projects/${p.id}`}>Continue</Link>
+    <button className="btn" onClick={()=>dispatch({type:'DELETE_PROJECT',id:p.id})}>Delete</button></div></div>)}</div><Link to="/build" className="btn mt-8">+ New project</Link></div>;
+}
+export function ProjectDetail(){
+  const {id}=useParams(),{projects,dispatch}=useProjects(),p=projects.find(x=>x.id===id);
+  const {dispatch:cartDispatch}=useCart();
+  if(!p)return <p className="p-10">Project not found.</p>;
+  const over=p.spent>p.budget;
+  const planned=p.plannedTotal??p.products.reduce((sum,item)=>sum+item.price,0);
+  return <div className="mx-auto max-w-5xl px-5 py-12"><Heading k={p.style}>{p.name}</Heading><HomeInsights p={p}/>
+    <section className="grid gap-5 border-y border-stone/50 py-5 sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-stone">Project type</p><p className="mt-1">{p.homeType||'Home project'}</p></div><div><p className="text-xs text-stone">House size</p><p className="mt-1">{p.size?`${p.size} m² · ${p.floors} floors`:'Not set'}</p></div><div><p className="text-xs text-stone">Land size</p><p className="mt-1">{p.landSize?`${p.landSize} m²`:'Not set'}</p></div><div><p className="text-xs text-stone">Rooms</p><p className="mt-1">{p.rooms||'Not set'}</p></div></section>
+    {p.features?.length>0&&<p className="mt-4 text-sm text-stone">Features: {p.features.join(' · ')}</p>}
+  <section className="my-8 grid gap-3 sm:grid-cols-3"><div className="border-t border-stone/50 pt-3"><p className="text-xs text-stone">Actual spend</p><p className="mt-1 font-display text-3xl">${p.spent.toLocaleString()}</p></div><div className="border-t border-stone/50 pt-3"><p className="text-xs text-stone">Shopping list value</p><p className="mt-1 font-display text-3xl">${planned.toLocaleString()}</p></div><div className="border-t border-stone/50 pt-3"><p className="text-xs text-stone">Budget remaining</p><p className={`mt-1 font-display text-3xl ${over?'text-accent':''}`}>${Math.max(0,p.budget-p.spent).toLocaleString()}</p></div></section>
+  <p className="mb-2 text-xs uppercase tracking-widest text-stone">Build progress · {p.progress}%</p><Progress value={p.progress}/><p className={`mt-3 text-sm ${over?'text-accent':''}`}>{over?'Budget exceeded by':'Actual spend'} ${over?(p.spent-p.budget).toLocaleString():`${p.spent.toLocaleString()} of $${p.budget.toLocaleString()}`}</p>
+   <h2 className="mb-3 mt-10 font-display text-3xl">Timeline</h2><ul className="grid gap-2 md:grid-cols-2">{Object.entries(p.steps).map(([k,v])=><li key={k}><button className="card w-full text-left" onClick={()=>dispatch({type:'UPDATE_PROGRESS',id,payload:k})}>{v?'✓':'○'} {k}</button></li>)}</ul>
+  {p.budgetAllocation&&<section className="mt-10"><h2 className="mb-4 font-display text-3xl">Planned budget</h2><div className="grid gap-2 sm:grid-cols-2">{Object.entries(p.budgetAllocation).map(([name,value])=><p key={name} className="flex justify-between border-b border-stone/40 py-2 text-sm"><span>{name}</span><span>${value.toLocaleString()}</span></p>)}</div></section>}
+  {p.services?.length>0&&<section className="mt-10"><h2 className="mb-3 font-display text-3xl">Services in this plan</h2>{p.services.map(name=><div key={name} className="mb-2 flex items-center justify-between border-b border-stone/40 py-3"><span>{name}</span><button className="text-xs text-accent underline" onClick={()=>dispatch({type:'UPDATE_PROJECT',id,payload:{services:p.services.filter(item=>item!==name)}})}>Remove</button></div>)}</section>}
+  <h2 className="mb-3 mt-10 font-display text-3xl">Shopping list · planned</h2>{p.products.length?p.products.map(x=><div key={x.id} className="card mb-2 flex flex-wrap items-center justify-between gap-3"><span>{x.name} · ${x.price}</span><div className="flex gap-3"><button className="text-sm underline" onClick={()=>cartDispatch({type:'ADD_TO_CART',payload:x,projectId:p.id,projectName:p.name})}>Add to cart</button><button className="text-sm text-accent" onClick={()=>dispatch({type:'REMOVE_PRODUCT_FROM_PROJECT',id,payload:x.id})}>Remove</button></div></div>):<p>Use "Add to home" in the shop.</p>}
+  <h2 className="mb-3 mt-10 font-display text-3xl">Purchased for this project</h2>{p.purchasedItems?.length?p.purchasedItems.map((item,index)=><div key={`${item.orderId}-${item.id}-${index}`} className="flex flex-wrap justify-between gap-2 border-b border-stone/40 py-3 text-sm"><span>{item.name} × {item.qty}</span><span>${(item.price*item.qty).toLocaleString()} · {item.orderId}</span></div>):<p className="text-sm text-stone">No completed purchases have been assigned to this project.</p>}</div>;
+}
